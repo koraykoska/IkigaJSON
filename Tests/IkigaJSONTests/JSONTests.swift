@@ -1608,26 +1608,28 @@ final class IkigaJSONTests: XCTestCase {
         XCTAssertThrowsError(try decoder.decode(Foo.self, from: ByteBuffer(string: #"{"foo1":0,"foo2":0}"#)))
     }
 
-//    func testJsonArrayDeepMutate() throws {
-//        let json = """
-//        [
-//          {
-//            "jsonrpc": "2.0",
-//            "method": "eth_getBlockByNumber",
-//            "params": ["0x14966a9", true],
-//            "id": null
-//          }
-//        ]
-//        """.data(using: .utf8)!
-//
-//        var typedJson = try! JSONArray(data: json)
-//
-//        XCTAssertEqual(typedJson[0]["id"]?.null, NSNull())
-//
-//        typedJson[0]["id"] = "08443908-C466-4D0E-AF84-E1641E853ED"
-//
-//        XCTAssertEqual(typedJson[0]["id"]?.string, "08443908-C466-4D0E-AF84-E1641E853ED")
-//    }
+    func testJsonArrayDeepMutate() throws {
+        let json = """
+        [
+          {
+            "jsonrpc": "2.0",
+            "method": "eth_getBlockByNumber",
+            "params": ["0x14966a9", true],
+            "id": null
+          }
+        ]
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONArray(data: json)
+
+        XCTAssertEqual(typedJson[0].object?["id"]?.null, NSNull())
+
+        var firstObject = typedJson[0].object!
+        firstObject["id"] = "08443908-C466-4D0E-AF84-E1641E853ED"
+        typedJson[0] = firstObject
+
+        XCTAssertEqual(typedJson[0].object?["id"]?.string, "08443908-C466-4D0E-AF84-E1641E853ED")
+    }
 
     func testJsonLevelOneNullToStringMutate() throws {
         let json = """

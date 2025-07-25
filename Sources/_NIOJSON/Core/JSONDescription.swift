@@ -507,7 +507,18 @@ extension JSONDescription {
             
             buffer.prepareForRewrite(atOffset: Int(jsonBounds.offset), oldSize: Int(jsonBounds.length), newSize: _length)
             buffer.setBuffer(object.jsonBuffer, at: Int(jsonBounds.offset))
-            let newDescription = object.jsonDescription.slice(from: 0, length: object.jsonDescription.writtenBytes)
+
+            // Re-parse the new buffer region to build a fresh JSONDescription
+            let subBuffer = buffer.getSlice(at: Int(jsonBounds.offset), length: Int(_length))!
+            let newDescription: JSONDescription = subBuffer.withBytePointer { pointer in
+                var tokenizer = JSONTokenizer(
+                    pointer: pointer,
+                    count: subBuffer.readableBytes,
+                    destination: JSONDescription()
+                )
+                try! tokenizer.scanValue()
+                return tokenizer.destination
+            }
             newDescription.advanceAllJSONOffsets(by: jsonBounds.offset)
             rewriteObjectArray(locallyAt: indexOffset, from: newDescription)
         case let array as JSONArray:
