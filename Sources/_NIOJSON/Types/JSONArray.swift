@@ -23,20 +23,20 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
         guard lhsCount == rhs.count else {
             return false
         }
-        
+
         for i in 0..<lhsCount where !equateJSON(lhs[i], rhs[i]) {
             return false
         }
-        
+
         return true
     }
-    
+
     /// The raw textual (JSON formatted) representation of this JSONArray
     public internal(set) var jsonBuffer: ByteBuffer
-    
+
     /// An internal index that keeps track of all values within this JSONArray
     var jsonDescription: JSONDescription
-    
+
     /// A textual (JSON formatted) representation of this JSONArray as `Foundation.Data`
     public var data: Data {
         return jsonBuffer.withUnsafeReadableBytes { buffer in
@@ -47,28 +47,28 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
     public var description: String {
         string
     }
-    
+
     /// A list of all top-level keys within this JSONArray
     public var string: String! {
         return String(data: data, encoding: .utf8)
     }
-    
+
     /// Creates a new, empty JSONArray
     public init() {
         self.init(descriptionSize: 4_096)
     }
-    
+
     /// Parses the data as a JSON Array and configures this JSONArray to index and represent the JSON data
     public init(data: Data) throws {
         var buffer = ByteBufferAllocator().buffer(capacity: data.count)
         buffer.writeBytes(data)
         try self.init(buffer: buffer)
     }
-    
+
     /// Parses the buffer as a JSON Array and configures this JSONArray to index and represent the JSON data
     public init(buffer: ByteBuffer) throws(JSONArrayError) {
         self.jsonBuffer = buffer
-        
+
         do {
             self.jsonDescription = try buffer.withUnsafeReadableBytes { buffer in
                 Result<JSONDescription, JSONParserError> { () throws(JSONParserError) -> JSONDescription in
@@ -91,14 +91,14 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
             throw JSONArrayError.expectedArray
         }
     }
-    
+
     /// An internal type that creates an empty JSONArray with a predefined expected description size
     private init(descriptionSize: Int) {
         var buffer = ByteBufferAllocator().buffer(capacity: 4_096)
         buffer.writeInteger(UInt8.squareLeft)
         buffer.writeInteger(UInt8.squareRight)
         self.jsonBuffer = buffer
-        
+
         let description = JSONDescription(size: descriptionSize)
         let context = description.arrayStartFound(JSONToken.ArrayStart(start: .init(byteIndex: 0)))
         let result = JSONToken.ArrayEnd(
@@ -110,40 +110,40 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
 
         self.jsonDescription = description
     }
-    
+
     public func makeIterator() -> JSONArrayIterator {
         return JSONArrayIterator(array: self)
     }
-    
+
     /// Creates a new JSONArray from an array literal.
     ///
     ///     var names: JSONArray = ["Joannis", "Robbert", "Testie"]
     public init(arrayLiteral elements: JSONValue...) {
         self.init()
-        
+
         for element in elements {
             self.append(element)
         }
     }
-    
+
     public var count: Int {
         return jsonDescription.arrayObjectCount()
     }
-    
+
     internal init(buffer: ByteBuffer, description: JSONDescription) {
         self.jsonBuffer = buffer
         self.jsonDescription = description
     }
-    
+
     public mutating func append(_ value: JSONValue) {
         let oldSize = jsonBuffer.writerIndex
         // Before `]`
         jsonBuffer.moveWriterIndex(to: jsonBuffer.writerIndex &- 1)
-        
+
         if count > 0 {
             jsonBuffer.writeInteger(UInt8.comma)
         }
-        
+
         let valueJSONOffset = jsonBuffer.writerIndex
         let indexOffset = jsonDescription.writtenBytes
 
@@ -152,13 +152,13 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
             let extraSize = jsonBuffer.writerIndex - oldSize
             jsonDescription.incrementArrayCount(jsonSize: Int32(extraSize), atIndexOffset: indexOffset)
         }
-        
+
         func write(_ string: String) -> (offset: Int, length: Int) {
             jsonBuffer.writeString(string)
             let length = jsonBuffer.writerIndex - valueJSONOffset
             return (offset: valueJSONOffset, length: length)
         }
-        
+
         switch value {
         case let value as String:
             // TODO: Without copy
@@ -223,28 +223,28 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
         precondition(index <= jsonDescription.arrayObjectCount(), "Index out of bounds. \(index) > \(count)")
         precondition(index >= 0, "Negative index requested for JSONArray.")
     }
-    
+
     private func value(at index: Int, in json: UnsafePointer<UInt8>) -> JSONValue {
         _checkBounds(index)
-        
+
         // Array descriptions are 17 bytes
         var offset = Constants.firstArrayObjectChildOffset
-        
+
         for _ in 0..<index {
             jsonDescription.skipIndex(atOffset: &offset)
         }
-        
+
         let type = jsonDescription.type(atOffset: offset)
-        
+
         switch type {
         case .object, .array:
             let indexLength = jsonDescription.indexLength(atOffset: offset)
             let jsonBounds = jsonDescription.dataBounds(atIndexOffset: offset)
-            
+
             let subDescription = jsonDescription.slice(from: offset, length: indexLength)
             subDescription.advanceAllJSONOffsets(by: -jsonBounds.offset)
             let subBuffer = jsonBuffer.getSlice(at: Int(jsonBounds.offset), length: Int(jsonBounds.length))!
-            
+
             if type == .object {
                 return JSONObject(buffer: subBuffer, description: subDescription)
             } else {
@@ -291,15 +291,27 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
         }
         set {
             _checkBounds(index)
-            
+
             // Array descriptions are 17 bytes
             var offset = Constants.firstArrayObjectChildOffset
-            
+
             for _ in 0..<index {
                 jsonDescription.skipIndex(atOffset: &offset)
             }
 
             jsonDescription.rewrite(buffer: &jsonBuffer, to: newValue, at: offset)
+
+            // Re-parse the entire array to ensure proper offset handling
+            let newDescription = jsonBuffer.withBytePointer { pointer in
+                var tokenizer = JSONTokenizer(
+                    pointer: pointer,
+                    count: jsonBuffer.readableBytes,
+                    destination: JSONDescription()
+                )
+                try! tokenizer.scanValue()
+                return tokenizer.destination
+            }
+            self.jsonDescription = newDescription
         }
     }
 }
@@ -307,13 +319,13 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
 extension String {
     internal var escaped: (Bool, [UInt8]) {
         var escaped = false
-        
+
         var characters = [UInt8](self.utf8)
-        
+
         var i = characters.count
         nextByte: while i > 0 {
             i = i &- 1
-            
+
             switch characters[i] {
             case .newLine:
                 escaped = true
@@ -345,22 +357,22 @@ extension String {
                 continue
             }
         }
-        
+
         return (escaped, characters)
     }
 }
 
 public struct JSONArrayIterator: IteratorProtocol {
     private let array: JSONArray
-    
+
     init(array: JSONArray) {
         self.array = array
         self.count = array.count
     }
-    
+
     private let count: Int
     private var index = 0
-    
+
     public mutating func next() -> JSONValue? {
         guard index < count else { return nil }
         defer { index = index &+ 1 }
