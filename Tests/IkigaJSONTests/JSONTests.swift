@@ -1607,4 +1607,235 @@ final class IkigaJSONTests: XCTestCase {
         XCTAssertThrowsError(try decoder.decode(Foo.self, from: ByteBuffer(string: #"{"foo1":0,"foo3":0}"#)))
         XCTAssertThrowsError(try decoder.decode(Foo.self, from: ByteBuffer(string: #"{"foo1":0,"foo2":0}"#)))
     }
+
+//    func testJsonArrayDeepMutate() throws {
+//        let json = """
+//        [
+//          {
+//            "jsonrpc": "2.0",
+//            "method": "eth_getBlockByNumber",
+//            "params": ["0x14966a9", true],
+//            "id": null
+//          }
+//        ]
+//        """.data(using: .utf8)!
+//
+//        var typedJson = try! JSONArray(data: json)
+//
+//        XCTAssertEqual(typedJson[0]["id"]?.null, NSNull())
+//
+//        typedJson[0]["id"] = "08443908-C466-4D0E-AF84-E1641E853ED"
+//
+//        XCTAssertEqual(typedJson[0]["id"]?.string, "08443908-C466-4D0E-AF84-E1641E853ED")
+//    }
+
+    func testJsonLevelOneNullToStringMutate() throws {
+        let json = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": null
+        }
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONObject(data: json)
+
+        XCTAssertEqual(typedJson["id"]?.null, NSNull())
+
+        typedJson["id"] = "08443908-C466-4D0E-AF84-E1641E853ED"
+
+        XCTAssertEqual(typedJson["id"]?.string, "08443908-C466-4D0E-AF84-E1641E853ED")
+
+        let expectedResultString = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": "08443908-C466-4D0E-AF84-E1641E853ED"
+        }
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
+    func testJsonLevelOneNullToDoubleMutate() throws {
+        let json = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": null
+        }
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONObject(data: json)
+
+        XCTAssertEqual(typedJson["id"]?.null, NSNull())
+
+        typedJson["id"] = 1287.051287
+
+        XCTAssertEqual(typedJson["id"]?.double, 1287.051287)
+
+        let expectedResultString = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": 1287.051287
+        }
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
+    func testJsonLevelOneNullToIntMutate() throws {
+        let json = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": null
+        }
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONObject(data: json)
+
+        XCTAssertEqual(typedJson["id"]?.null, NSNull())
+
+        typedJson["id"] = 1287051287
+
+        XCTAssertEqual(typedJson["id"]?.int, 1287051287)
+
+        let expectedResultString = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": 1287051287
+        }
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
+    func testJsonLevelOneNullToBoolTrueMutate() throws {
+        let json = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": null
+        }
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONObject(data: json)
+
+        XCTAssertEqual(typedJson["id"]?.null, NSNull())
+
+        typedJson["id"] = true
+
+        XCTAssertEqual(typedJson["id"]?.bool, true)
+
+        let expectedResultString = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": true
+        }
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
+    func testJsonLevelOneNullToBoolFalseMutate() throws {
+        let json = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": null
+        }
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONObject(data: json)
+
+        XCTAssertEqual(typedJson["id"]?.null, NSNull())
+
+        typedJson["id"] = false
+
+        XCTAssertEqual(typedJson["id"]?.bool, false)
+
+        let expectedResultString = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": false
+        }
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
+    func testJsonLevelOneStringToStringMutate() throws {
+        let json = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": 1
+        }
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONObject(data: json)
+
+        XCTAssertEqual(typedJson["method"]?.string, "eth_getBlockByNumber")
+
+        typedJson["method"] = "eth_getBlock"
+
+        XCTAssertEqual(typedJson["method"]?.string, "eth_getBlock")
+
+        let expectedResultString = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlock",
+          "params": ["0x14966a9", true],
+          "id": 1
+        }
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
+    func testJsonLevelOneStringToNullMutate() throws {
+        let json = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": "08443908-C466-4D0E-AF84-E1641E853ED"
+        }
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONObject(data: json)
+
+        XCTAssertEqual(typedJson["id"]?.string, "08443908-C466-4D0E-AF84-E1641E853ED")
+
+        typedJson["id"] = NSNull()
+
+        XCTAssertEqual(typedJson["id"]?.null, NSNull())
+
+        let expectedResultString = """
+        {
+          "jsonrpc": "2.0",
+          "method": "eth_getBlockByNumber",
+          "params": ["0x14966a9", true],
+          "id": null
+        }
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
 }

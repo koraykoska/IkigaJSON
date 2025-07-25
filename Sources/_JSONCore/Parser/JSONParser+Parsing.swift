@@ -134,9 +134,10 @@ extension JSONTokenizer {
             guard pointer[1] == .a, pointer[2] == .l, pointer[3] == .s, pointer[4] == .e else {
                 throw JSONParserError.invalidLiteral(line: line, column: column)
             }
-            
+
+            let startOffset = currentOffset
             advance(5)
-            destination.booleanFalseFound(.init(start: .init(byteIndex: currentOffset)))
+            destination.booleanFalseFound(.init(start: .init(byteIndex: startOffset)))
         case .t: // true
             guard count > 4 else {
                 throw JSONParserError.missingData(line: line, column: column)
@@ -145,9 +146,10 @@ extension JSONTokenizer {
             guard pointer[1] == .r, pointer[2] == .u, pointer[3] == .e else {
                 throw JSONParserError.invalidLiteral(line: line, column: column)
             }
-            
+
+            let startOffset = currentOffset
             advance(4)
-            destination.booleanTrueFound(.init(start: .init(byteIndex: currentOffset)))
+            destination.booleanTrueFound(.init(start: .init(byteIndex: startOffset)))
         case .n: // null
             guard count > 4 else {
                 throw JSONParserError.missingData(line: line, column: column)
@@ -157,8 +159,9 @@ extension JSONTokenizer {
                 throw JSONParserError.invalidLiteral(line: line, column: column)
             }
             
+            let startOffset = currentOffset
             advance(4)
-            destination.nullFound(.init(start: .init(byteIndex: currentOffset)))
+            destination.nullFound(.init(start: .init(byteIndex: startOffset)))
         case .zero ... .nine, .minus:// Numerical
             try scanNumber()
         default:
