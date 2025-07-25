@@ -524,7 +524,7 @@ extension JSONDescription {
             buffer.prepareForRewrite(atOffset: Int(jsonBounds.offset), oldSize: Int(jsonBounds.length), newSize: 4)
 
             _ = buffer.setStaticString(nullBytes, at: Int(jsonBounds.offset))
-            rewriteTrue(atIndexOffset: indexOffset, jsonOffset: jsonBounds.offset)
+            rewriteNull(atIndexOffset: indexOffset, jsonOffset: jsonBounds.offset)
         }
     }
 
