@@ -1608,6 +1608,47 @@ final class IkigaJSONTests: XCTestCase {
         XCTAssertThrowsError(try decoder.decode(Foo.self, from: ByteBuffer(string: #"{"foo1":0,"foo2":0}"#)))
     }
 
+    func testJsonArraySimpleMutate() throws {
+        let json = """
+        [
+          "test",
+          true,
+          1,
+          null,
+          false,
+          [1, 2, 3, true, false, null, 1, true, [], {}, {}, {"id": null,"method":"test123_test"}]
+        ]
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONArray(data: json)
+
+        XCTAssertEqual(typedJson[3].null, NSNull())
+
+        typedJson[3] = "test_mutated_array_string"
+
+        print(String(data: typedJson.data, encoding: .utf8)!)
+        print(String(data: typedJson[5][11].object!.data, encoding: .utf8)!)
+        XCTAssertEqual(typedJson[3].string, "test_mutated_array_string")
+        XCTAssertEqual(typedJson[0].string, "test")
+        XCTAssertEqual(typedJson[1].bool, true)
+        XCTAssertEqual(typedJson[4].bool, false)
+        XCTAssertEqual(typedJson[5][7].bool, true)
+        XCTAssertEqual(typedJson[5][11]["method"]?.string, "test123_test")
+
+        let expectedResultString = """
+        [
+          "test",
+          true,
+          1,
+          "test_mutated_array_string",
+          false,
+          [1, 2, 3, true, false, null, 1, true, [], {}, {}, {"id": null,"method":"test123_test"}]
+        ]
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
     func testJsonArrayDeepMutate() throws {
         let json = """
         [
@@ -1629,6 +1670,81 @@ final class IkigaJSONTests: XCTestCase {
         typedJson[0] = firstObject
 
         XCTAssertEqual(typedJson[0].object?["id"]?.string, "08443908-C466-4D0E-AF84-E1641E853ED")
+
+        let expectedResultString = """
+        [
+          {
+            "jsonrpc": "2.0",
+            "method": "eth_getBlockByNumber",
+            "params": ["0x14966a9", true],
+            "id": "08443908-C466-4D0E-AF84-E1641E853ED"
+          }
+        ]
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
+    }
+
+    func testJsonTwoDimensionalArrayDeepMutate() throws {
+        let json = """
+        [
+          [
+            {
+              "jsonrpc": "2.0",
+              "method": "eth_getBlockByNumber",
+              "params": ["0x14966a9", true],
+              "id": null
+            },
+            {
+              "jsonrpc": "2.0",
+              "method": "eth_getBlockByNumber",
+              "params": ["0x14966a9", true],
+              "id": "1"
+            },
+            {
+              "jsonrpc": "2.0",
+              "method": "eth_getBlockByNumber",
+              "params": ["0x14966a9", true],
+              "id": false
+            }
+          ]
+        ]
+        """.data(using: .utf8)!
+
+        var typedJson = try! JSONArray(data: json)
+
+        XCTAssertEqual(typedJson[0][1]["id"]?.string, "1")
+
+        typedJson[0][1]["id"] = true
+
+        XCTAssertEqual(typedJson[0][1]["id"]?.bool, true)
+
+        let expectedResultString = """
+        [
+          [
+            {
+              "jsonrpc": "2.0",
+              "method": "eth_getBlockByNumber",
+              "params": ["0x14966a9", true],
+              "id": null
+            },
+            {
+              "jsonrpc": "2.0",
+              "method": "eth_getBlockByNumber",
+              "params": ["0x14966a9", true],
+              "id": true
+            },
+            {
+              "jsonrpc": "2.0",
+              "method": "eth_getBlockByNumber",
+              "params": ["0x14966a9", true],
+              "id": false
+            }
+          ]
+        ]
+        """
+
+        XCTAssertEqual(String(data: typedJson.data, encoding: .utf8), expectedResultString)
     }
 
     func testJsonLevelOneNullToStringMutate() throws {

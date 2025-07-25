@@ -163,7 +163,7 @@ package final class JSONDescription: JSONTokenizerDestination {
         copy.writtenBytes = length
         return copy
     }
-    
+
     /// Creates a new JSONDescription reserving 512 bytes by default.
     init(size: Int = 4096) {
         self.pointer = .allocate(byteCount: size, alignment: 1)
@@ -175,32 +175,32 @@ extension ByteBuffer {
     mutating func removeBytes(atOffset offset: Int, oldSize: Int) {
         prepareForRewrite(atOffset: offset, oldSize: oldSize, newSize: 0)
     }
-    
+
     mutating func prepareForRewrite(atOffset offset: Int, oldSize: Int, newSize: Int) {
         // `if newSize == 5 && oldSize == 3` then We need to write over 0..<5
         // Meaning we move the rest back by (5 - 3 = 2)
-        
+
         // Or if `newSize == 3 && oldSize == 5` we write over 0..<3 and move forward by 2 (or -2 offset)
         let diff = newSize - oldSize
-        
+
         if diff == 0 { return }
         let writerIndex = self.writerIndex
         reserveCapacity(writerIndex + diff)
-        
+
         let endIndex = offset + oldSize
         let remainder = writerIndex - endIndex
-        
+
         if remainder > 0 {
             self.withUnsafeMutableReadableBytes { buffer in
                 let pointer = buffer.baseAddress!
-                
+
                 let source = pointer + endIndex
                 let destination = source + diff
-                
+
                 memmove(destination, source, remainder)
             }
         }
-        
+
         moveWriterIndex(to: writerIndex + diff)
     }
 }
@@ -256,38 +256,38 @@ extension JSONDescription {
     /// Moves this index description and all it's child descriptions their JSON offsets forward
     func advanceAllJSONOffsets(by jsonOffset: Int32) {
         self.advance(at: Constants.jsonLocationOffset, by: jsonOffset)
-        
+
         var indexOffset = Constants.firstArrayObjectChildOffset
-        
+
         while indexOffset < writtenBytes {
             self.advance(at: indexOffset + Constants.jsonLocationOffset, by: jsonOffset)
             indexOffset = indexOffset &+ type(atOffset: indexOffset).indexLength
         }
     }
-    
+
     var topLevelType: JSONType {
         return type(atOffset: 0)
     }
-    
+
     func arrayObjectCount() -> Int {
         assert(self.topLevelType == .array || self.topLevelType == .object)
-        
+
         guard let count: Int32 = getInteger(
             at: Constants.arrayObjectPairCountOffset
         ) else {
             fatalError("Invalid Array or Object description. Missing header data. Please file an issue on Github.")
         }
-        
+
         return Int(count)
     }
-    
+
     func type(atOffset offset: Int) -> JSONType {
         assert(offset < writtenBytes)
-        
+
         guard let typeByte: UInt8 = getInteger(at: offset), let type = JSONType(rawValue: typeByte) else {
             fatalError("The JSON index is corrupt. No JSON Type could be found at offset \(offset). Please file a bug report on Github.")
         }
-        
+
         return type
     }
 
@@ -300,7 +300,7 @@ extension JSONDescription {
             ) else {
                 fatalError("The JSON index is corrupt. No IndexLength could be found for all children of an object or array. Please file a bug report on Github.")
             }
-            
+
             assert(childrenLength <= Int32(writtenBytes))
             return Constants.arrayObjectIndexLength + Int(childrenLength)
         case .boolTrue, .boolFalse, .null:
@@ -310,11 +310,11 @@ extension JSONDescription {
             return Constants.stringNumberIndexLength
         }
     }
-    
+
     func skipIndex(atOffset offset: inout Int) {
         offset = offset &+ indexLength(atOffset: offset)
     }
-    
+
     /// Removes a key-value pair from object descriptions only.
     /// Removes both the key and the value from this description
     func removeObjectDescription(atKeyIndex keyOffset: Int, jsonOffset: Int, removedJSONLength: Int) {
@@ -323,21 +323,21 @@ extension JSONDescription {
         // Remove key AND value
         // First include the key length
         let keyIndexLength = indexLength(atOffset: keyOffset)
-        
+
         // Join the value's index length with the key's
         let valueIndexLength = indexLength(atOffset: keyOffset + keyIndexLength)
-        
+
         let removedIndexLength = keyIndexLength + valueIndexLength
 
         // Remove the object index
         removeBytes(atOffset: keyOffset, oldSize: removedIndexLength)
-        
+
         advance(at: Constants.arrayObjectTotalIndexLengthOffset, by: Int32(-removedIndexLength))
         advance(at: Constants.arrayObjectPairCountOffset, by: -1)
         advance(at: Constants.jsonLengthOffset, by: Int32(-removedJSONLength))
 
         var updateLocationOffset = Constants.firstArrayObjectChildOffset
-        
+
         // Move back offsets >= the removed offset
         for _ in 0..<arrayObjectCount() {
             let successivePair = dataBounds(atIndexOffset: updateLocationOffset).offset >= jsonOffset
@@ -394,13 +394,13 @@ extension JSONDescription {
         assert(topLevelType == .object)
 
         let valueIndexLength = self.indexLength(atOffset: valueOffset)
-        
+
         let addedIndexSize = Int32(Constants.stringNumberIndexLength + valueIndexLength)
-        
+
         // Increment the index and json length accordingly
         advance(at: Constants.arrayObjectTotalIndexLengthOffset, by: addedIndexSize)
         advance(at: Constants.jsonLengthOffset, by: jsonSize)
-        
+
         // Update the pair count by 1, since a value was added
         advance(at: Constants.arrayObjectPairCountOffset, by: 1)
     }
@@ -408,14 +408,14 @@ extension JSONDescription {
     /// Assumes `self` to be a description of a `JSONArray`
     func incrementArrayCount(jsonSize: Int32, atIndexOffset indexOffset: Int) {
         assert(topLevelType == .array)
-        
+
         // Fetches the indexLength of the newly added value
         let addedIndexLength = self.indexLength(atOffset: indexOffset)
-        
+
         // Increment the index and json length accordingly
         advance(at: Constants.arrayObjectTotalIndexLengthOffset, by: Int32(addedIndexLength))
         advance(at: Constants.jsonLengthOffset, by: jsonSize)
-        
+
         // Update the pair count by 1, since a value was added
         advance(at: Constants.arrayObjectPairCountOffset, by: 1)
     }
@@ -433,11 +433,11 @@ extension JSONDescription {
         case let string as String:
             let baseOffset = Int(jsonBounds.offset)
             let (escaped, characters) = string.escaped
-            
+
             let characterCount = characters.count
             let _length = characterCount + 2
             length = Int32(_length)
-            
+
             buffer.prepareForRewrite(atOffset: baseOffset, oldSize: Int(jsonBounds.length), newSize: _length)
             buffer.setInteger(UInt8.quote, at: baseOffset)
             buffer.setBytes(characters, at: baseOffset + 1)
@@ -504,7 +504,7 @@ extension JSONDescription {
         case let object as JSONObject:
             let _length = object.jsonBuffer.writerIndex
             length = Int32(_length)
-            
+
             buffer.prepareForRewrite(atOffset: Int(jsonBounds.offset), oldSize: Int(jsonBounds.length), newSize: _length)
             buffer.setBuffer(object.jsonBuffer, at: Int(jsonBounds.offset))
 
@@ -524,10 +524,21 @@ extension JSONDescription {
         case let array as JSONArray:
             let _length = array.jsonBuffer.writerIndex
             length = Int32(_length)
-            
+
             buffer.prepareForRewrite(atOffset: Int(jsonBounds.offset), oldSize: Int(jsonBounds.length), newSize: _length)
             buffer.setBuffer(array.jsonBuffer, at: Int(jsonBounds.offset))
-            let newDescription = array.jsonDescription
+
+            // Re-parse the new buffer region to build a fresh JSONDescription
+            let subBuffer = buffer.getSlice(at: Int(jsonBounds.offset), length: Int(_length))!
+            let newDescription: JSONDescription = subBuffer.withBytePointer { pointer in
+                var tokenizer = JSONTokenizer(
+                    pointer: pointer,
+                    count: subBuffer.readableBytes,
+                    destination: JSONDescription()
+                )
+                try! tokenizer.scanValue()
+                return tokenizer.destination
+            }
             newDescription.advanceAllJSONOffsets(by: jsonBounds.offset)
             rewriteObjectArray(locallyAt: indexOffset, from: newDescription)
         default:
@@ -582,24 +593,24 @@ extension JSONDescription {
     func rewriteNull(atIndexOffset indexOffset: Int, jsonOffset: Int32) {
         rewriteShortType(to: .null, indexOffset: indexOffset, jsonOffset: jsonOffset)
     }
-    
+
     func rewriteTrue(atIndexOffset offset: Int, jsonOffset: Int32) {
         rewriteShortType(to: .boolTrue, indexOffset: offset, jsonOffset: jsonOffset)
     }
-    
+
     func rewriteFalse(atIndexOffset offset: Int, jsonOffset: Int32) {
         rewriteShortType(to: .boolFalse, indexOffset: offset, jsonOffset: jsonOffset)
     }
-    
+
     func rewriteObjectArray(locallyAt localOffset: Int, from newDescription: JSONDescription) {
         let oldLength = self.indexLength(atOffset: localOffset)
         let newLength = newDescription.indexLength(atOffset: 0)
-        
+
         prepareForRewrite(atOffset: localOffset, oldSize: oldLength, newSize: newLength)
-        
+
         setBuffer(to: newDescription, at: localOffset)
     }
-    
+
     func describeString(_ string: JSONToken.String) {
         let type: JSONType = string.usesEscaping ? .stringWithEscaping : .string
 
@@ -608,51 +619,51 @@ extension JSONDescription {
         writeInteger(Int32(string.start.byteOffset))
         writeInteger(Int32(string.byteLength))
     }
-    
+
     func describeNumber(_ number: JSONToken.Number) {
         // Make a destinction between floating points and integers
         let type = number.isInteger ? JSONType.integer.rawValue : JSONType.floatingNumber.rawValue
 
         // Set the new type identifier
         self.writeInteger(type)
-        
+
         self.writeInteger(Int32(number.start.byteOffset))
         self.writeInteger(Int32(number.byteLength))
     }
-    
+
     func describeTrue(atJSONOffset jsonOffset: Int32) {
         writeInteger(JSONType.boolTrue.rawValue)
         writeInteger(jsonOffset)
     }
-    
+
     func describeFalse(atJSONOffset jsonOffset: Int32) {
         writeInteger(JSONType.boolFalse.rawValue)
         writeInteger(jsonOffset)
     }
-    
+
     func describeNull(atJSONOffset jsonOffset: Int32) {
         writeInteger(JSONType.null.rawValue)
         writeInteger(jsonOffset)
     }
-    
+
     func describeArray(atJSONOffset jsonOffset: Int32) -> ArrayStartContext {
         let indexOffset = writtenBytes
         writeInteger(JSONType.array.rawValue)
         writeInteger(jsonOffset)
         moveWriterIndex(forwardBy: 12)
-        
+
         return ArrayStartContext(
             indexOffset: indexOffset,
             firstChildIndexOffset: writtenBytes
         )
     }
-    
+
     func describeObject(atJSONOffset jsonOffset: Int32) -> ObjectStartContext {
         let indexOffset = writtenBytes
         writeInteger(JSONType.object.rawValue)
         writeInteger(jsonOffset)
         moveWriterIndex(forwardBy: 12)
-        
+
         return ObjectStartContext(
             indexOffset: indexOffset,
             firstChildIndexOffset: writtenBytes
@@ -702,10 +713,10 @@ extension String {
         var utf8 = Array(self.utf8)
         let size = utf8.count
         var i = size
-        
+
         while i > 0 {
             i &-= 1
-            
+
             let byte = utf8[i]
             if byte >= .A && byte <= .Z {
                 // make lowercased
@@ -713,7 +724,7 @@ extension String {
                 utf8.insert(.underscore, at: i)
             }
         }
-        
+
         return String(bytes: utf8, encoding: .utf8)!
     }
 }
@@ -725,32 +736,32 @@ extension JSONDescription {
             offset: offset
         )
     }
-    
+
     private func convertSnakeCasing(for characters: inout Data) {
         var size = characters.count
         var i = 0
-        
+
         while i < size {
             if characters[i] == .underscore, i &+ 1 < size {
                 size = size &- 1
                 let byte = characters[i &+ 1]
-                
+
                 if byte >= .a && byte <= .z {
                     characters[i] = byte &- 0x20
                     characters.remove(at: i &+ 1)
                 }
             }
-            
+
             i = i &+ 1
         }
     }
-    
+
     private func snakeCasedEqual(key: UnsafeBufferPointer<UInt8>, pointer: UnsafePointer<UInt8>, length: Int) -> Bool {
         let keySize = key.count
         var characters = Data(bytes: pointer, count: length)
         // TODO: Compare without copy
         convertSnakeCasing(for: &characters)
-        
+
         // The string was guaranteed by us to still be valid UTF-8
         let byteCount = characters.count
         if byteCount == keySize {
@@ -758,10 +769,10 @@ extension JSONDescription {
                 return memcmp(key.baseAddress!, buffer.baseAddress!, keySize) == 0
             }
         }
-        
+
         return false
     }
-    
+
     func containsKey(
         _ key: String,
         convertingSnakeCasing: Bool,
@@ -771,7 +782,7 @@ extension JSONDescription {
     ) -> Bool {
         return valueOffset(forKey: key, convertingSnakeCasing: convertingSnakeCasing, in: json) != nil
     }
-    
+
     func keyOffset(
         forKey key: String,
         convertingSnakeCasing: Bool,
@@ -780,7 +791,7 @@ extension JSONDescription {
         // Object index
         var index = 0
         var offset = Constants.firstArrayObjectChildOffset
-        
+
         guard
             let count: Int32 = self.getInteger(
                 at: Constants.arrayObjectPairCountOffset
@@ -820,7 +831,7 @@ extension JSONDescription {
             return nil
         }
     }
-    
+
     func valueOffset(
         forKey key: String,
         convertingSnakeCasing: Bool,
@@ -829,25 +840,25 @@ extension JSONDescription {
         guard let data = keyOffset(forKey: key, convertingSnakeCasing: convertingSnakeCasing, in: buffer) else {
             return nil
         }
-        
+
         let index = data.index
         var offset = data.offset
         // Skip key
         skipIndex(atOffset: &offset)
-        
+
         return (index, offset)
     }
-    
+
     func offset(forIndex index: Int) -> Int {
         assert(self.topLevelType == .array)
         var offset = Constants.firstArrayObjectChildOffset
         for _ in 0..<index {
             skipIndex(atOffset: &offset)
         }
-        
+
         return offset
     }
-    
+
     func type(
         ofKey key: String,
         convertingSnakeCasing: Bool,
@@ -856,10 +867,10 @@ extension JSONDescription {
         guard let (_, offset) = valueOffset(forKey: key, convertingSnakeCasing: convertingSnakeCasing, in: buffer) else {
             return nil
         }
-        
+
         return self.type(atOffset: offset)
     }
-    
+
     func keys(
         inPointer buffer: UnsafePointer<UInt8>,
         unicode: Bool,
@@ -867,13 +878,13 @@ extension JSONDescription {
         atIndex offset: Int = Constants.firstArrayObjectChildOffset
     ) -> [String] {
         assert(self.topLevelType == .object)
-        
+
         let count = arrayObjectCount()
         var offset = offset
-        
+
         var keys = [String]()
         keys.reserveCapacity(numericCast(count))
-        
+
         for _ in 0..<count {
             let bounds = dataBounds(atIndexOffset: offset)
 
@@ -887,16 +898,16 @@ extension JSONDescription {
                 if convertingSnakeCasing {
                     convertSnakeCasing(for: &stringData)
                 }
-                
+
                 if let key = String(data: stringData, encoding: .utf8) {
                     keys.append(key)
                 }
             }
-            
+
             skipIndex(atOffset: &offset)
             skipIndex(atOffset: &offset)
         }
-        
+
         return keys
     }
 
@@ -904,7 +915,7 @@ extension JSONDescription {
     /// quotes
     func dataBounds(atIndexOffset indexOffset: Int) -> (offset: Int32, length: Int32) {
         let jsonOffset = self.jsonOffset(at: indexOffset)
-        
+
         switch self.type(atOffset: indexOffset) {
         case .boolFalse:
             return (
@@ -932,7 +943,7 @@ extension JSONDescription {
     /// The bounds of the entire JSON token, including quotes for a String
     func jsonBounds(at indexOffset: Int) -> (offset: Int32, length: Int32) {
         let jsonOffset = self.jsonOffset(at: indexOffset)
-        
+
         switch self.type(atOffset: indexOffset) {
         case .boolFalse:
             return (
@@ -951,17 +962,17 @@ extension JSONDescription {
             )
         }
     }
-    
+
     private func jsonLength(at indexOffset: Int) -> Int32 {
         guard let length: Int32 = getInteger(
             at: indexOffset + Constants.jsonLengthOffset
         ) else {
             fatalError("Missing data to form a JSONLength. Please file an issue on Github")
         }
-        
+
         return length
     }
-    
+
     /// The offset where you can find this value in JSON
     private func jsonOffset(at indexOffset: Int) -> Int32 {
         guard let offset: Int32 = getInteger(
@@ -969,10 +980,10 @@ extension JSONDescription {
         ) else {
             fatalError("Invalid Array or Object description. Missing header data. Please file an issue on Github.")
         }
-        
+
         return offset
     }
-    
+
     func stringBounds(
         forKey key: String,
         convertingSnakeCasing: Bool,
@@ -987,10 +998,10 @@ extension JSONDescription {
         else {
             return nil
         }
-        
+
         let type = self.type(atOffset: offset)
         guard type == .string || type == .stringWithEscaping else { return nil }
-        
+
         let bounds = dataBounds(atIndexOffset: offset)
         return JSONToken.String(
             start: JSONSourcePosition(byteIndex: Int(bounds.offset)),
@@ -998,7 +1009,7 @@ extension JSONDescription {
             usesEscaping: type == .stringWithEscaping
         )
     }
-    
+
     func integerBounds(
         forKey key: String,
         convertingSnakeCasing: Bool,
@@ -1013,7 +1024,7 @@ extension JSONDescription {
         else {
             return nil
         }
-        
+
         let type = self.type(atOffset: offset)
         guard type == .integer else { return nil }
 
@@ -1024,7 +1035,7 @@ extension JSONDescription {
             isInteger: true
         )
     }
-    
+
     func floatingBounds(
         forKey key: String,
         convertingSnakeCasing: Bool,
@@ -1039,7 +1050,7 @@ extension JSONDescription {
         else {
             return nil
         }
-        
+
         let type = self.type(atOffset: offset)
         guard type == .integer || type == .floatingNumber else { return nil }
 
