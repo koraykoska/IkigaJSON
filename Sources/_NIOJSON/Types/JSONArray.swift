@@ -299,19 +299,48 @@ public struct JSONArray: ExpressibleByArrayLiteral, Sequence, Equatable, CustomS
                 jsonDescription.skipIndex(atOffset: &offset)
             }
 
+            let oldBounds = jsonDescription.jsonBounds(at: offset)
+
+            // Calculate expected new size based on the value type
+            let expectedNewSize: Int32
+            let isComplexType: Bool
+            switch newValue {
+            case let string as String:
+                let (_, characters) = string.escaped
+                expectedNewSize = Int32(characters.count + 2) // +2 for quotes
+                isComplexType = false
+            case let double as Double:
+                expectedNewSize = Int32(String(double).utf8.count)
+                isComplexType = false
+            case let int as Int:
+                expectedNewSize = Int32(String(int).utf8.count)
+                isComplexType = false
+            case let bool as Bool:
+                expectedNewSize = Int32(bool ? 4 : 5) // "true" or "false"
+                isComplexType = false
+            case _ as NSNull:
+                expectedNewSize = 4 // "null"
+                isComplexType = false
+            case let object as JSONObject:
+                expectedNewSize = Int32(object.jsonBuffer.writerIndex)
+                isComplexType = true
+            case let array as JSONArray:
+                expectedNewSize = Int32(array.jsonBuffer.writerIndex)
+                isComplexType = true
+            default:
+                expectedNewSize = 4 // default to null size
+                isComplexType = false
+            }
+
+            let jsonSizeDiff = expectedNewSize - oldBounds.length
+
             jsonDescription.rewrite(buffer: &jsonBuffer, to: newValue, at: offset)
 
-            // Re-parse the entire array to ensure proper offset handling
-            let newDescription = jsonBuffer.withBytePointer { pointer in
-                var tokenizer = JSONTokenizer(
-                    pointer: pointer,
-                    count: jsonBuffer.readableBytes,
-                    destination: JSONDescription()
-                )
-                try! tokenizer.scanValue()
-                return tokenizer.destination
+            // Only apply offset propagation for simple types
+            // Complex types (objects/arrays) are handled properly by the rewrite method itself
+            if !isComplexType && jsonSizeDiff != 0 {
+                jsonDescription.advanceArrayElementOffsets(startingFromIndex: index + 1, by: jsonSizeDiff)
             }
-            self.jsonDescription = newDescription
         }
     }
 }

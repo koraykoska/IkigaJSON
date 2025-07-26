@@ -265,6 +265,29 @@ extension JSONDescription {
         }
     }
 
+    /// Advances JSON offsets for all array elements starting from a specific element index
+    /// This is used when an element in the middle of an array changes size and all subsequent elements need offset updates
+    func advanceArrayElementOffsets(startingFromIndex startIndex: Int, by offsetDiff: Int32) {
+        assert(topLevelType == .array, "This method should only be called on array descriptions")
+
+        guard offsetDiff != 0 else { return }
+
+        var indexOffset = Constants.firstArrayObjectChildOffset
+        var currentElementIndex = 0
+
+        // Skip to the starting index
+        while currentElementIndex < startIndex && indexOffset < writtenBytes {
+            indexOffset = indexOffset &+ type(atOffset: indexOffset).indexLength
+            currentElementIndex += 1
+        }
+
+        // Advance JSON location offsets for all subsequent elements
+        while indexOffset < writtenBytes {
+            advance(at: indexOffset + Constants.jsonLocationOffset, by: offsetDiff)
+            indexOffset = indexOffset &+ type(atOffset: indexOffset).indexLength
+        }
+    }
+
     var topLevelType: JSONType {
         return type(atOffset: 0)
     }
